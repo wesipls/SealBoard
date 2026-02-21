@@ -18,8 +18,6 @@ type HostConfig struct {
 	Address           string `yaml:"address"`
 	User              string `yaml:"user"`
 	PrivateKeyPath    string `yaml:"private_key_path"`
-	TunnelPort        int    `yaml:"tunnel_port"`
-	LocalPort         int    `yaml:"local_port"`
 	SocketPath        string `yaml:"socket_path"`
 	RemoteSocketPath  string `yaml:"remote_socket_path"`
 	LocalSocketPath   string `yaml:"local_socket_path"`
@@ -58,8 +56,6 @@ func main() {
 					sp = strings.ReplaceAll(sp, "${UID}", fmt.Sprintf("%d", uid))
 				}
 				callPodmanAPIUnix(sp, "/v4.0.0/containers/json?all=true", host.Name)
-			} else {
-				callPodmanAPI(fmt.Sprintf("http://localhost:%d/v4.0.0/containers/json?all=true", host.TunnelPort), host.Name)
 			}
 			continue
 		}
@@ -116,50 +112,10 @@ func main() {
 				}
 			}()
 			callPodmanAPIUnix(lsp, "/v4.0.0/containers/json?all=true", host.Name)
-		} else {
-			localEndpoint := fmt.Sprintf("localhost:%d", host.LocalPort)
-			remoteEndpoint := fmt.Sprintf("localhost:%d", host.TunnelPort)
-			listener, err := net.Listen("tcp", localEndpoint)
-			if err != nil {
-				log.Printf("Failed to listen on local tunnel for %s: %v", host.Name, err)
-				continue
-			}
-			defer listener.Close()
-			go func() {
-				for {
-					local, err := listener.Accept()
-					if err != nil {
-						log.Println("Local tunnel error:", err)
-						continue
-					}
-					remote, err := sshConn.Dial("tcp", remoteEndpoint)
-					if err != nil {
-						log.Println("Remote tunnel error:", err)
-						local.Close()
-						continue
-					}
-					go proxyConn(local, remote)
-				}
-			}()
-			callPodmanAPI(fmt.Sprintf("http://localhost:%d/v4.0.0/containers/json?all=true", host.LocalPort), host.Name)
 		}
 	}
 }
 
-func callPodmanAPI(url, label string) {
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Printf("Failed to request Podman API at %s: %v", label, err)
-		return
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Failed to read Podman API response at %s: %v", label, err)
-		return
-	}
-	fmt.Printf("[%s] Podman stats raw response: %s\n", label, string(body))
-}
 
 func callPodmanAPIUnix(socketPath, apiPath, label string) {
 	transport := &http.Transport{
