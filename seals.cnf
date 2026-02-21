@@ -1,0 +1,12 @@
+# Example SealBoard configuration
+hosts:
+  - name: "localhost"
+    address: "localhost"
+    tunnel_port: 3000
+#  - name: "remote1"
+#    address: "your.remote.host"
+#    user: "youruser"
+#    private_key_path: "$HOME/.ssh/id_rsa"
+#    tunnel_port: 3000
+#    local_port: 5000
+

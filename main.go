@@ -1,0 +1,121 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"log"
+	"net"
+	"net/http"
+	"strings"
+	"gopkg.in/yaml.v3"
+	"golang.org/x/crypto/ssh"
+)
+
+type HostConfig struct {
+	Name           string `yaml:"name"`
+	Address        string `yaml:"address"`
+	User           string `yaml:"user"`
+	PrivateKeyPath string `yaml:"private_key_path"`
+	TunnelPort     int    `yaml:"tunnel_port"`
+	LocalPort      int    `yaml:"local_port"`
+}
+
+type Config struct {
+	Hosts []HostConfig `yaml:"hosts"`
+}
+
+func loadConfig(path string) ([]HostConfig, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var cfg Config
+	dec := yaml.NewDecoder(f)
+	if err := dec.Decode(&cfg); err != nil {
+		return nil, err
+	}
+	return cfg.Hosts, nil
+}
+
+func main() {
+	hosts, err := loadConfig("seals.cnf")
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
+	for _, host := range hosts {
+		fmt.Printf("\n--- Connecting to %s ---\n", host.Name)
+		if host.Address == "localhost" || strings.HasPrefix(host.Address, "127.") {
+			callPodmanAPI(fmt.Sprintf("http://localhost:%d/v4.0.0/containers/json?all=true", host.TunnelPort), host.Name)
+			continue
+		}
+		key, err := os.ReadFile(os.ExpandEnv(host.PrivateKeyPath))
+		if err != nil {
+			log.Printf("Unable to read private key for %s: %v", host.Name, err)
+			continue
+		}
+		signer, err := ssh.ParsePrivateKey(key)
+		if err != nil {
+			log.Printf("Unable to parse private key for %s: %v", host.Name, err)
+			continue
+		}
+		sshConfig := &ssh.ClientConfig{
+			User: host.User,
+			Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		}
+		sshConn, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", host.Address), sshConfig)
+		if err != nil {
+			log.Printf("Failed to dial SSH for %s: %v", host.Name, err)
+			continue
+		}
+		defer sshConn.Close()
+		localEndpoint := fmt.Sprintf("localhost:%d", host.LocalPort)
+		remoteEndpoint := fmt.Sprintf("localhost:%d", host.TunnelPort)
+		listener, err := net.Listen("tcp", localEndpoint)
+		if err != nil {
+			log.Printf("Failed to listen on local tunnel for %s: %v", host.Name, err)
+			continue
+		}
+		defer listener.Close()
+		go func() {
+			for {
+				local, err := listener.Accept()
+				if err != nil {
+					log.Println("Local tunnel error:", err)
+					continue
+				}
+				remote, err := sshConn.Dial("tcp", remoteEndpoint)
+				if err != nil {
+					log.Println("Remote tunnel error:", err)
+					local.Close()
+					continue
+				}
+				go proxyConn(local, remote)
+			}
+		}()
+		callPodmanAPI(fmt.Sprintf("http://localhost:%d/v4.0.0/containers/json?all=true", host.LocalPort), host.Name)
+	}
+}
+
+func callPodmanAPI(url, label string) {
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Printf("Failed to request Podman API at %s: %v", label, err)
+		return
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Failed to read Podman API response at %s: %v", label, err)
+		return
+	}
+	fmt.Printf("[%s] Podman stats raw response: %s\n", label, string(body))
+}
+
+func proxyConn(local net.Conn, remote net.Conn) {
+	go func() { _, _ = io.Copy(local, remote); local.Close() }()
+	go func() { _, _ = io.Copy(remote, local); remote.Close() }()
+}
+
