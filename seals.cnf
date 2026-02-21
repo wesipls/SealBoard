@@ -2,7 +2,7 @@
 hosts:
   - name: "localhost"
     address: "localhost"
-    tunnel_port: 3000
+    socket_path: "/run/user/${UID}/podman/podman.sock"
 #  - name: "remote1"
 #    address: "your.remote.host"
 #    user: "youruser"

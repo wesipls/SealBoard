@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"context"
 	"gopkg.in/yaml.v3"
 	"golang.org/x/crypto/ssh"
 )
@@ -19,6 +20,7 @@ type HostConfig struct {
 	PrivateKeyPath string `yaml:"private_key_path"`
 	TunnelPort     int    `yaml:"tunnel_port"`
 	LocalPort      int    `yaml:"local_port"`
+	SocketPath     string `yaml:"socket_path"`
 }
 
 type Config struct {
@@ -47,7 +49,16 @@ func main() {
 	for _, host := range hosts {
 		fmt.Printf("\n--- Connecting to %s ---\n", host.Name)
 		if host.Address == "localhost" || strings.HasPrefix(host.Address, "127.") {
-			callPodmanAPI(fmt.Sprintf("http://localhost:%d/v4.0.0/containers/json?all=true", host.TunnelPort), host.Name)
+			if host.SocketPath != "" {
+				sp := host.SocketPath
+				if strings.Contains(sp, "${UID}") {
+					uid := os.Getuid()
+					sp = strings.ReplaceAll(sp, "${UID}", fmt.Sprintf("%d", uid))
+				}
+				callPodmanAPIUnix(sp, "/v4.0.0/containers/json?all=true", host.Name)
+			} else {
+				callPodmanAPI(fmt.Sprintf("http://localhost:%d/v4.0.0/containers/json?all=true", host.TunnelPort), host.Name)
+			}
 			continue
 		}
 		key, err := os.ReadFile(os.ExpandEnv(host.PrivateKeyPath))
@@ -109,6 +120,28 @@ func callPodmanAPI(url, label string) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("Failed to read Podman API response at %s: %v", label, err)
+		return
+	}
+	fmt.Printf("[%s] Podman stats raw response: %s\n", label, string(body))
+}
+
+func callPodmanAPIUnix(socketPath, apiPath, label string) {
+	transport := &http.Transport{
+		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+			return net.Dial("unix", socketPath)
+		},
+	}
+	client := &http.Client{Transport: transport}
+	url := "http://d/v4.0.0/containers/json?all=true" // The host part is ignored for UNIX sockets
+	resp, err := client.Get(url)
+	if err != nil {
+		log.Printf("Failed to request Podman API (unix socket) at %s: %v", label, err)
+		return
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Failed to read UNIX Podman API response at %s: %v", label, err)
 		return
 	}
 	fmt.Printf("[%s] Podman stats raw response: %s\n", label, string(body))
