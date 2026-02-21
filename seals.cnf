@@ -7,6 +7,6 @@ hosts:
 #    address: "your.remote.host"
 #    user: "youruser"
 #    private_key_path: "$HOME/.ssh/id_rsa"
-#    tunnel_port: 3000
-#    local_port: 5000
+#    remote_socket_path: "/run/user/${UID}/podman/podman.sock"
+#    local_socket_path: "/tmp/sealboard-remote1.sock"
 

@@ -14,13 +14,15 @@ import (
 )
 
 type HostConfig struct {
-	Name           string `yaml:"name"`
-	Address        string `yaml:"address"`
-	User           string `yaml:"user"`
-	PrivateKeyPath string `yaml:"private_key_path"`
-	TunnelPort     int    `yaml:"tunnel_port"`
-	LocalPort      int    `yaml:"local_port"`
-	SocketPath     string `yaml:"socket_path"`
+	Name              string `yaml:"name"`
+	Address           string `yaml:"address"`
+	User              string `yaml:"user"`
+	PrivateKeyPath    string `yaml:"private_key_path"`
+	TunnelPort        int    `yaml:"tunnel_port"`
+	LocalPort         int    `yaml:"local_port"`
+	SocketPath        string `yaml:"socket_path"`
+	RemoteSocketPath  string `yaml:"remote_socket_path"`
+	LocalSocketPath   string `yaml:"local_socket_path"`
 }
 
 type Config struct {
@@ -82,31 +84,65 @@ func main() {
 			continue
 		}
 		defer sshConn.Close()
-		localEndpoint := fmt.Sprintf("localhost:%d", host.LocalPort)
-		remoteEndpoint := fmt.Sprintf("localhost:%d", host.TunnelPort)
-		listener, err := net.Listen("tcp", localEndpoint)
-		if err != nil {
-			log.Printf("Failed to listen on local tunnel for %s: %v", host.Name, err)
-			continue
-		}
-		defer listener.Close()
-		go func() {
-			for {
-				local, err := listener.Accept()
-				if err != nil {
-					log.Println("Local tunnel error:", err)
-					continue
-				}
-				remote, err := sshConn.Dial("tcp", remoteEndpoint)
-				if err != nil {
-					log.Println("Remote tunnel error:", err)
-					local.Close()
-					continue
-				}
-				go proxyConn(local, remote)
+		if host.LocalSocketPath != "" && host.RemoteSocketPath != "" {
+			lsp := host.LocalSocketPath
+			rsp := host.RemoteSocketPath
+			if strings.Contains(rsp, "${UID}") {
+				uid := os.Getuid()
+				rsp = strings.ReplaceAll(rsp, "${UID}", fmt.Sprintf("%d", uid))
 			}
-		}()
-		callPodmanAPI(fmt.Sprintf("http://localhost:%d/v4.0.0/containers/json?all=true", host.LocalPort), host.Name)
+			// Remove any stale local socket
+			_ = os.Remove(lsp)
+			listener, err := net.Listen("unix", lsp)
+			if err != nil {
+				log.Printf("Failed to listen on local unix socket for %s: %v", host.Name, err)
+				continue
+			}
+			defer listener.Close()
+			go func() {
+				for {
+					local, err := listener.Accept()
+					if err != nil {
+						log.Println("Local unix tunnel error:", err)
+						continue
+					}
+					remote, err := sshConn.Dial("unix", rsp)
+					if err != nil {
+						log.Println("Remote unix tunnel error:", err)
+						local.Close()
+						continue
+					}
+					go proxyConn(local, remote)
+				}
+			}()
+			callPodmanAPIUnix(lsp, "/v4.0.0/containers/json?all=true", host.Name)
+		} else {
+			localEndpoint := fmt.Sprintf("localhost:%d", host.LocalPort)
+			remoteEndpoint := fmt.Sprintf("localhost:%d", host.TunnelPort)
+			listener, err := net.Listen("tcp", localEndpoint)
+			if err != nil {
+				log.Printf("Failed to listen on local tunnel for %s: %v", host.Name, err)
+				continue
+			}
+			defer listener.Close()
+			go func() {
+				for {
+					local, err := listener.Accept()
+					if err != nil {
+						log.Println("Local tunnel error:", err)
+						continue
+					}
+					remote, err := sshConn.Dial("tcp", remoteEndpoint)
+					if err != nil {
+						log.Println("Remote tunnel error:", err)
+						local.Close()
+						continue
+					}
+					go proxyConn(local, remote)
+				}
+			}()
+			callPodmanAPI(fmt.Sprintf("http://localhost:%d/v4.0.0/containers/json?all=true", host.LocalPort), host.Name)
+		}
 	}
 }
 
