@@ -2,20 +2,15 @@ package main
 
 import (
 	"fmt"
-	"os"
+	"golang.org/x/crypto/ssh"
 	"log"
 	"net"
-	"time"
+	"os"
 	"strings"
-	"golang.org/x/crypto/ssh"
+	"time"
 )
 
-
-func pollHosts() {
-	hosts, err := loadConfig("seals.cnf")
-	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
-	}
+func pollHosts(hosts []HostConfig) {
 	for _, host := range hosts {
 		fmt.Printf("\n--- Connecting to %s ---\n", host.Name)
 		if host.Address == "localhost" || strings.HasPrefix(host.Address, "127.") {
@@ -39,12 +34,16 @@ func pollHosts() {
 			log.Printf("Unable to parse private key for %s: %v", host.Name, err)
 			continue
 		}
+		sshPort := 22
+		if host.SSHPort != 0 {
+			sshPort = host.SSHPort
+		}
 		sshConfig := &ssh.ClientConfig{
-			User: host.User,
-			Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+			User:            host.User,
+			Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		}
-		sshConn, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", host.Address), sshConfig)
+		sshConn, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host.Address, sshPort), sshConfig)
 		if err != nil {
 			log.Printf("Failed to dial SSH for %s: %v", host.Name, err)
 			continue
@@ -57,7 +56,6 @@ func pollHosts() {
 				uid := os.Getuid()
 				rsp = strings.ReplaceAll(rsp, "${UID}", fmt.Sprintf("%d", uid))
 			}
-			// Remove any stale local socket
 			_ = os.Remove(lsp)
 			listener, err := net.Listen("unix", lsp)
 			if err != nil {
@@ -70,9 +68,9 @@ func pollHosts() {
 					local, err := listener.Accept()
 					if err != nil {
 						if !strings.Contains(err.Error(), "use of closed network connection") {
-											log.Println("Local unix tunnel error:", err)
-										}
-										continue
+							log.Println("Local unix tunnel error:", err)
+						}
+						continue
 					}
 					remote, err := sshConn.Dial("unix", rsp)
 					if err != nil {
@@ -89,15 +87,16 @@ func pollHosts() {
 }
 
 func main() {
-	interval := 30 // Poll every 30 seconds
+	hosts, globalInterval, err := loadConfig("seals.cfg")
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
+	interval := globalInterval
 	log.Printf("Polling hosts every %d seconds. Press Ctrl+C to exit.", interval)
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 	for {
-		pollHosts()
+		pollHosts(hosts)
 		<-ticker.C
 	}
 }
-
-
-
