@@ -5,12 +5,13 @@ import (
 	"os"
 	"log"
 	"net"
+	"time"
 	"strings"
 	"golang.org/x/crypto/ssh"
 )
 
 
-func main() {
+func pollHosts() {
 	hosts, err := loadConfig("seals.cnf")
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
@@ -84,6 +85,17 @@ func main() {
 			}()
 			callPodmanAPIUnix(lsp, "/v4.0.0/containers/json?all=true", host.Name)
 		}
+	}
+}
+
+func main() {
+	interval := 30 // Poll every 30 seconds
+	log.Printf("Polling hosts every %d seconds. Press Ctrl+C to exit.", interval)
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	defer ticker.Stop()
+	for {
+		pollHosts()
+		<-ticker.C
 	}
 }
 
