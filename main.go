@@ -2,44 +2,13 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"log"
 	"net"
-	"net/http"
 	"strings"
-	"context"
-	"gopkg.in/yaml.v3"
 	"golang.org/x/crypto/ssh"
 )
 
-type HostConfig struct {
-	Name              string `yaml:"name"`
-	Address           string `yaml:"address"`
-	User              string `yaml:"user"`
-	PrivateKeyPath    string `yaml:"private_key_path"`
-	SocketPath        string `yaml:"socket_path"`
-	RemoteSocketPath  string `yaml:"remote_socket_path"`
-	LocalSocketPath   string `yaml:"local_socket_path"`
-}
-
-type Config struct {
-	Hosts []HostConfig `yaml:"hosts"`
-}
-
-func loadConfig(path string) ([]HostConfig, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	var cfg Config
-	dec := yaml.NewDecoder(f)
-	if err := dec.Decode(&cfg); err != nil {
-		return nil, err
-	}
-	return cfg.Hosts, nil
-}
 
 func main() {
 	hosts, err := loadConfig("seals.cnf")
@@ -119,30 +88,4 @@ func main() {
 }
 
 
-func callPodmanAPIUnix(socketPath, apiPath, label string) {
-	transport := &http.Transport{
-		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-			return net.Dial("unix", socketPath)
-		},
-	}
-	client := &http.Client{Transport: transport}
-	url := "http://d/v4.0.0/containers/json?all=true" // The host part is ignored for UNIX sockets
-	resp, err := client.Get(url)
-	if err != nil {
-		log.Printf("Failed to request Podman API (unix socket) at %s: %v", label, err)
-		return
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Failed to read UNIX Podman API response at %s: %v", label, err)
-		return
-	}
-	fmt.Printf("[%s] Podman stats raw response: %s\n", label, string(body))
-}
-
-func proxyConn(local net.Conn, remote net.Conn) {
-	go func() { _, _ = io.Copy(local, remote); local.Close() }()
-	go func() { _, _ = io.Copy(remote, local); remote.Close() }()
-}
 
