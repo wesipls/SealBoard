@@ -99,8 +99,10 @@ func main() {
 				for {
 					local, err := listener.Accept()
 					if err != nil {
-						log.Println("Local unix tunnel error:", err)
-						continue
+						if !strings.Contains(err.Error(), "use of closed network connection") {
+											log.Println("Local unix tunnel error:", err)
+										}
+										continue
 					}
 					remote, err := sshConn.Dial("unix", rsp)
 					if err != nil {
