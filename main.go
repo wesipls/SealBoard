@@ -87,12 +87,21 @@ func pollHosts(hosts []HostConfig) {
 }
 
 func main() {
-	hosts, globalInterval, err := loadConfig("seals.cfg")
+	hosts, globalInterval, allowedHTTPHosts, err := loadConfig("seals.cfg")
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
 	interval := globalInterval
 	log.Printf("Polling hosts every %d seconds. Press Ctrl+C to exit.", interval)
+
+	// Start the lightweight HTTP stats server restricted to allowed hosts
+	StartStatsServer(allowedHTTPHosts, func() interface{} {
+		// TODO: Replace this with correct stats, for now just report host names
+		return map[string]interface{}{
+			"hosts": hosts,
+		}
+	})
+
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 	for {

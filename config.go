@@ -23,22 +23,24 @@ type HostConfig struct {
 // interval is the polling interval in seconds
 // hosts is the list of host configs
 type Config struct {
-	Interval int          `yaml:"interval"`
-	Hosts    []HostConfig `yaml:"hosts"`
+	Interval        int          `yaml:"interval"`
+	Hosts           []HostConfig `yaml:"hosts"`
+	HTTPAllowedHosts []string    `yaml:"http_allowed_hosts"`
 }
 
 // loadConfig reads YAML config file and returns HostConfigs and global interval
-func loadConfig(path string) ([]HostConfig, int, error) {
+// loadConfig reads YAML config file and returns HostConfigs, global interval, and allowed HTTP hosts
+func loadConfig(path string) ([]HostConfig, int, []string, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 	defer f.Close()
 	var cfg Config
 	dec := yaml.NewDecoder(f)
 	if err := dec.Decode(&cfg); err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
-	return cfg.Hosts, cfg.Interval, nil
+	return cfg.Hosts, cfg.Interval, cfg.HTTPAllowedHosts, nil
 }
 
