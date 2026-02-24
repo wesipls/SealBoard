@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"encoding/json"
 	"golang.org/x/crypto/ssh"
 	"log"
 	"net"
@@ -96,10 +97,19 @@ func main() {
 
 	// Start the lightweight HTTP stats server restricted to allowed hosts
 	StartStatsServer(allowedHTTPHosts, func() interface{} {
-		// TODO: Replace this with correct stats, for now just report host names
-		return map[string]interface{}{
-			"hosts": hosts,
-		}
+			// Serve latest cached Podman data per host
+			podmanStatsMu.RLock()
+			defer podmanStatsMu.RUnlock()
+			result := make(map[string]interface{})
+			for label, data := range podmanStats {
+				var parsed interface{}
+				if err := json.Unmarshal(data, &parsed); err == nil {
+					result[label] = parsed
+				} else {
+					result[label] = string(data)
+				}
+			}
+			return result
 	})
 
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)

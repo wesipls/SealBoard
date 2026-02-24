@@ -7,6 +7,13 @@ import (
 	"net"
 	"net/http"
 	"context"
+	"sync"
+)
+
+// PodmanStats holds the latest stats/result per host
+var (
+	podmanStatsMu sync.RWMutex
+	podmanStats = map[string][]byte{} // key: host label, value: raw json
 )
 
 // callPodmanAPIUnix queries the Podman API over Unix socket
@@ -29,6 +36,9 @@ func callPodmanAPIUnix(socketPath, apiPath, label string) {
 		log.Printf("Failed to read UNIX Podman API response at %s: %v", label, err)
 		return
 	}
-	fmt.Printf("[%s] Podman stats raw response: %s\n", label, string(body))
+	podmanStatsMu.Lock()
+	podmanStats[label] = body
+	podmanStatsMu.Unlock()
+	fmt.Printf("[%s] Podman stats cached, %d bytes\n", label, len(body))
 }
 
