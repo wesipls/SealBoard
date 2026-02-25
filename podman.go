@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"context"
 	"sync"
+	"encoding/json"
 )
 
 // PodmanStats holds the latest stats/result per host
@@ -29,7 +30,14 @@ func callPodmanAPIUnix(socketPath, apiPath, label string) {
 	if err != nil {
 		log.Printf("Failed to request Podman API (unix socket) at %s: %v", label, err)
 		podmanStatsMu.Lock()
-		podmanStats[label] = []byte(fmt.Sprintf(`{"error": "Failed to request Podman API (unix socket): %v"}`, err))
+		// Ensure an array so frontend always renders a row for the host
+		errorArr := []map[string]interface{}{{
+			"host": label,
+			"status": "error",
+			"error": fmt.Sprintf("Failed to request Podman API (unix socket): %v", err),
+		}}
+		errBytes, _ := json.Marshal(errorArr)
+		podmanStats[label] = errBytes
 		podmanStatsMu.Unlock()
 		return
 	}

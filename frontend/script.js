@@ -52,6 +52,16 @@ function renderStats(data) {
       </tr>`;
       continue;
     }
+    // Display as error if status is 'error' (regardless of error msg)
+    if (container.status === 'error' || container.State === 'error' || container.Status === 'error') {
+      html += `<tr class="error">
+        <td>${container.host || ''}</td>
+        <td>${container.Id || ''}</td>
+        <td>${container.Names ? container.Names.join(', ') : ''}</td>
+        <td><span style='color:red'>error</span></td>
+      </tr>`;
+      continue;
+    }
     html += `<tr>
       <td>${container.host || ''}</td>
       <td>${container.Id || ''}</td>
