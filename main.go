@@ -116,7 +116,9 @@ func main() {
 			if err := json.Unmarshal(data, &parsed); err == nil {
 				result[label] = parsed
 			} else {
-				result[label] = string(data)
+				// If parsing fails, emit a standard error array for this label
+				errmsg := FormatErrorMsg("Internal stats/cache error for %s: %v", label, err)
+				result[label] = json.RawMessage(APIErrorArray(label, errmsg))
 			}
 		}
 		return result

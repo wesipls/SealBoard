@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 )
 
+
 // PodmanStats holds the latest stats/result per host
 var (
 	podmanStatsMu sync.RWMutex
