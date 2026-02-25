@@ -28,6 +28,9 @@ func callPodmanAPIUnix(socketPath, apiPath, label string) {
 	resp, err := client.Get(url)
 	if err != nil {
 		log.Printf("Failed to request Podman API (unix socket) at %s: %v", label, err)
+		podmanStatsMu.Lock()
+		podmanStats[label] = []byte(fmt.Sprintf(`{"error": "Failed to request Podman API (unix socket): %v"}`, err))
+		podmanStatsMu.Unlock()
 		return
 	}
 	defer resp.Body.Close()

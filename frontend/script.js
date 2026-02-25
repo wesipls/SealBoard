@@ -12,7 +12,9 @@ async function fetchStats() {
     // Flatten to an array
     containerData = [];
     for (const host in data) {
-      if (Array.isArray(data[host])) {
+      if (data[host] && data[host].error) {
+        containerData.push({host, error: data[host].error});
+      } else if (Array.isArray(data[host])) {
         data[host].forEach(container => {
           containerData.push({host, ...container});
         });
@@ -44,6 +46,12 @@ function renderStats(data) {
     <thead><tr><th>Host</th><th>ID</th><th>Name</th><th>Status</th></tr></thead>
     <tbody>`;
   for (const container of data) {
+    if (container.error) {
+      html += `<tr class="error">
+        <td colspan="4">${container.host}: <span style='color:red'>${container.error}</span></td>
+      </tr>`;
+      continue;
+    }
     html += `<tr>
       <td>${container.host || ''}</td>
       <td>${container.Id || ''}</td>
