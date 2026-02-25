@@ -33,8 +33,10 @@ func StartStatsServer(allowedHosts []string, statsFunc func() interface{}) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(statsFunc())
 	})
+
+	http.Handle("/", http.FileServer(http.Dir("./frontend")))
 	go func() {
-		log.Printf("Stats HTTP server listening on 127.0.0.1:8080 (allowed hosts: %v)", allowedHosts)
+		log.Printf("Stats HTTP+static server listening on 127.0.0.1:8080 (allowed hosts: %v)", allowedHosts)
 		http.ListenAndServe("127.0.0.1:8080", nil)
 	}()
 }
