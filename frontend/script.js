@@ -18,7 +18,18 @@ async function fetchStats() {
         });
       }
     }
-    renderStats(containerData);
+    // Always render using current search (if any)
+    const q = searchInput.value.toLowerCase();
+    const filtered = containerData.filter(c => {
+      return (
+        (c.Names && c.Names.join(', ').toLowerCase().includes(q)) ||
+        (c.Id && c.Id.toLowerCase().includes(q)) ||
+        (c.State && c.State.toLowerCase().includes(q)) ||
+        (c.Status && c.Status.toLowerCase().includes(q)) ||
+        (c.host && c.host.toLowerCase().includes(q))
+      );
+    });
+    renderStats(q ? filtered : containerData);
   } catch (err) {
     statsContainer.innerHTML = `<p class="error">Failed to fetch stats: ${err}</p>`;
   }
