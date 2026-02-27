@@ -2,21 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 )
 
-// expandUIDVariable replaces ${UID} with the current user's UID
-func expandUIDVariable(path string) string {
-	if strings.Contains(path, "${UID}") {
-		uid := os.Getuid()
-		return strings.ReplaceAll(path, "${UID}", fmt.Sprintf("%d", uid))
-	}
-	return path
-}
+// expandUIDVariable now handled by tunnel.go
 
 // SetupTunnels is now handled in tunnel.go
 

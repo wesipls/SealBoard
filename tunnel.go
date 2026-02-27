@@ -16,6 +16,7 @@ func proxyConn(local net.Conn, remote net.Conn) {
 }
 
 // SetupTunnels creates and runs all required SSH+unix tunnels for remote hosts at startup
+
 func SetupTunnels(hosts []HostConfig) {
 	for _, host := range hosts {
 		if host.LocalSocketPath != "" && host.RemoteSocketPath != "" {
