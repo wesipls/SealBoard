@@ -1,14 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"golang.org/x/crypto/ssh"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"time"
-	"net"
 )
 
 // expandUIDVariable replaces ${UID} with the current user's UID
@@ -33,12 +33,12 @@ func setupTunnels(hosts []HostConfig) {
 			_ = os.Remove(lsp) // Remove any old socket file
 			key, err := os.ReadFile(os.ExpandEnv(host.PrivateKeyPath))
 			if err != nil {
-				log.Printf("Unable to read private key for %s: %v", host.Name, err)
+				LogError("Unable to read private key for %s: %v", host.Name, err)
 				continue
 			}
 			signer, err := ssh.ParsePrivateKey(key)
 			if err != nil {
-				log.Printf("Unable to parse private key for %s: %v", host.Name, err)
+				LogError("Unable to parse private key for %s: %v", host.Name, err)
 				continue
 			}
 			sshPort := 22
@@ -52,12 +52,12 @@ func setupTunnels(hosts []HostConfig) {
 			}
 			sshConn, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host.Address, sshPort), sshConfig)
 			if err != nil {
-				log.Printf("Failed to dial SSH for %s: %v", host.Name, err)
+				LogError("Failed to dial SSH for %s: %v", host.Name, err)
 				continue
 			}
 			listener, err := net.Listen("unix", lsp)
 			if err != nil {
-				log.Printf("Failed to listen on local unix socket for %s: %v", host.Name, err)
+				LogError("Failed to listen on local unix socket for %s: %v", host.Name, err)
 				continue
 			}
 			go func(l, r string, listen net.Listener, sshConn *ssh.Client, hn string) {
@@ -65,13 +65,13 @@ func setupTunnels(hosts []HostConfig) {
 					local, err := listen.Accept()
 					if err != nil {
 						if !strings.Contains(err.Error(), "use of closed network connection") {
-							log.Printf("Local unix tunnel error (%s): %v", hn, err)
+							LogError("Local unix tunnel error (%s): %v", hn, err)
 						}
 						continue
 					}
 					remote, err := sshConn.Dial("unix", r)
 					if err != nil {
-						log.Printf("Remote unix tunnel error (%s): %v", hn, err)
+						LogError("Remote unix tunnel error (%s): %v", hn, err)
 						local.Close()
 						continue
 					}
@@ -84,7 +84,7 @@ func setupTunnels(hosts []HostConfig) {
 
 func pollHosts(hosts []HostConfig) {
 	for _, host := range hosts {
-		fmt.Printf("\n--- Connecting to %s ---\n", host.Name)
+		LogInfo("--- Connecting to %s ---", host.Name)
 		if host.Address == "localhost" || strings.HasPrefix(host.Address, "127.") {
 			if host.SocketPath != "" {
 				sp := host.SocketPath
@@ -106,7 +106,7 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 	interval := globalInterval
-	log.Printf("Polling hosts every %d seconds. Press Ctrl+C to exit.", interval)
+	LogInfo("Polling hosts every %d seconds. Press Ctrl+C to exit.", interval)
 
 	// Set up all required SSH+unix tunnels just once at startup
 	setupTunnels(hosts)
