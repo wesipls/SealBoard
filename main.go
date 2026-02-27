@@ -11,6 +11,15 @@ import (
 	"net"
 )
 
+// expandUIDVariable replaces ${UID} with the current user's UID
+func expandUIDVariable(path string) string {
+	if strings.Contains(path, "${UID}") {
+		uid := os.Getuid()
+		return strings.ReplaceAll(path, "${UID}", fmt.Sprintf("%d", uid))
+	}
+	return path
+}
+
 // setupTunnels creates and runs all required SSH+unix tunnels for remote hosts at startup
 func setupTunnels(hosts []HostConfig) {
 	for _, host := range hosts {
@@ -79,10 +88,7 @@ func pollHosts(hosts []HostConfig) {
 		if host.Address == "localhost" || strings.HasPrefix(host.Address, "127.") {
 			if host.SocketPath != "" {
 				sp := host.SocketPath
-				if strings.Contains(sp, "${UID}") {
-					uid := os.Getuid()
-					sp = strings.ReplaceAll(sp, "${UID}", fmt.Sprintf("%d", uid))
-				}
+				sp = expandUIDVariable(sp)
 				callPodmanAPIUnix(sp, "/v4.0.0/containers/json?all=true", host.Name)
 			}
 			continue
