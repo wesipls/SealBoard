@@ -18,13 +18,13 @@ func pollHosts(hosts []HostConfig) {
 			if host.SocketPath != "" {
 				sp := host.SocketPath
 				sp = expandUIDVariable(sp)
-				callPodmanAPIUnix(sp, "/v4.0.0/containers/json?all=true", host.Name)
+				callPodmanAPIUnix(sp, host.Name)
 			}
 			continue
 		}
 		if host.LocalSocketPath != "" && host.RemoteSocketPath != "" {
 			lsp := host.LocalSocketPath
-			callPodmanAPIUnix(lsp, "/v4.0.0/containers/json?all=true", host.Name)
+			callPodmanAPIUnix(lsp, host.Name)
 		}
 	}
 }

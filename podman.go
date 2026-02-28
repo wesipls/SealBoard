@@ -1,24 +1,22 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"context"
 	"sync"
-	"encoding/json"
 )
-
 
 // PodmanStats holds the latest stats/result per host
 var (
 	podmanStatsMu sync.RWMutex
-	podmanStats = map[string][]byte{} // key: host label, value: raw json
+	podmanStats   = map[string][]byte{} // key: host label, value: raw json
 )
 
 // callPodmanAPIUnix queries the Podman API over Unix socket
-func callPodmanAPIUnix(socketPath, apiPath, label string) {
+func callPodmanAPIUnix(socketPath, label string) {
 	transport := &http.Transport{
 		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 			return net.Dial("unix", socketPath)
@@ -30,14 +28,8 @@ func callPodmanAPIUnix(socketPath, apiPath, label string) {
 	if err != nil {
 		LogError("Failed to request Podman API (unix socket) at %s: %v", label, err)
 		podmanStatsMu.Lock()
-		// Ensure an array so frontend always renders a row for the host
-		errorArr := []map[string]interface{}{{
-			"host": label,
-			"status": "error",
-			"error": fmt.Sprintf("Failed to request Podman API (unix socket): %v", err),
-		}}
-		errBytes, _ := json.Marshal(errorArr)
-		podmanStats[label] = errBytes
+		// Use errorutil.go to standardize error array
+		podmanStats[label] = APIErrorArray(label, fmt.Sprintf("Failed to request Podman API (unix socket): %v", err))
 		podmanStatsMu.Unlock()
 		return
 	}
@@ -52,4 +44,3 @@ func callPodmanAPIUnix(socketPath, apiPath, label string) {
 	podmanStatsMu.Unlock()
 	LogInfo("[%s] Podman stats cached, %d bytes", label, len(body))
 }
-
