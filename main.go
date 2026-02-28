@@ -12,6 +12,8 @@ import (
 
 // pollHosts now provided in poller.go
 
+var podmanStatsCache = NewPodmanStatsCache()
+
 func main() {
 	hosts, globalInterval, allowedHTTPHosts, err := loadConfig("seals.cfg")
 	if err != nil {
@@ -26,19 +28,17 @@ func main() {
 	// Start the lightweight HTTP stats server restricted to allowed hosts
 	StartStatsServer(allowedHTTPHosts, func() interface{} {
 		// Serve latest cached Podman data per host
-		podmanStatsMu.RLock()
-		defer podmanStatsMu.RUnlock()
 		result := make(map[string]interface{})
-		for label, data := range podmanStats {
-			var parsed interface{}
-			if err := json.Unmarshal(data, &parsed); err == nil {
-				result[label] = parsed
-			} else {
-				// If parsing fails, emit a standard error array for this label
-				errmsg := FormatErrorMsg("Internal stats/cache error for %s: %v", label, err)
-				result[label] = json.RawMessage(APIErrorArray(label, errmsg))
-			}
-		}
+				podmanStatsCache.Range(func(label string, data []byte) {
+					var parsed interface{}
+					if err := json.Unmarshal(data, &parsed); err == nil {
+						result[label] = parsed
+					} else {
+						// If parsing fails, emit a standard error array for this label
+						errmsg := FormatErrorMsg("Internal stats/cache error for %s: %v", label, err)
+						result[label] = json.RawMessage(APIErrorArray(label, errmsg))
+					}
+				})
 		return result
 	})
 
