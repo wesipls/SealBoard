@@ -22,10 +22,7 @@ func SetupTunnels(hosts []HostConfig) {
 		if host.LocalSocketPath != "" && host.RemoteSocketPath != "" {
 			lsp := host.LocalSocketPath
 			rsp := host.RemoteSocketPath
-			if strings.Contains(rsp, "${UID}") {
-				uid := os.Getuid()
-				rsp = strings.ReplaceAll(rsp, "${UID}", fmt.Sprintf("%d", uid))
-			}
+			rsp = expandUIDVariable(rsp)
 			_ = os.Remove(lsp) // Remove any old socket file
 			key, err := os.ReadFile(os.ExpandEnv(host.PrivateKeyPath))
 			if err != nil {
