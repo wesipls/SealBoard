@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -30,7 +30,7 @@ type Config struct {
 
 // loadConfig reads YAML config file and returns HostConfigs and global interval
 // loadConfig reads YAML config file and returns HostConfigs, global interval, and allowed HTTP hosts
-func loadConfig(path string) ([]HostConfig, int, []string, error) {
+func LoadConfig(path string) ([]HostConfig, int, []string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, 0, nil, err

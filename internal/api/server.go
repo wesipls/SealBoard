@@ -1,9 +1,11 @@
-package main
+package api
 
 import (
 	"encoding/json"
 	"net"
 	"net/http"
+	
+		"sealboard/internal/util"
 )
 
 // StatsServer encapsulates HTTP stats serving logic and allowed hosts
@@ -25,7 +27,7 @@ func (s *StatsServer) Start() {
 	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
 		remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
-			LogError("Cannot parse remote address: %v", err)
+			util.LogError("Cannot parse remote address: %v", err)
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
@@ -47,7 +49,7 @@ func (s *StatsServer) Start() {
 
 	http.Handle("/", http.FileServer(http.Dir("./frontend")))
 	go func() {
-		LogInfo("Stats HTTP+static server listening on 127.0.0.1:8080 (allowed hosts: %v)", s.allowedHosts)
+		util.LogInfo("Stats HTTP+static server listening on 127.0.0.1:8080 (allowed hosts: %v)", s.allowedHosts)
 		http.ListenAndServe("127.0.0.1:8080", nil)
 	}()
 }
