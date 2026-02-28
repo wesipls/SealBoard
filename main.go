@@ -26,21 +26,22 @@ func main() {
 	SetupTunnels(hosts)
 
 	// Start the lightweight HTTP stats server restricted to allowed hosts
-	StartStatsServer(allowedHTTPHosts, func() interface{} {
-		// Serve latest cached Podman data per host
-		result := make(map[string]interface{})
-				podmanStatsCache.Range(func(label string, data []byte) {
-					var parsed interface{}
-					if err := json.Unmarshal(data, &parsed); err == nil {
-						result[label] = parsed
-					} else {
-						// If parsing fails, emit a standard error array for this label
-						errmsg := FormatErrorMsg("Internal stats/cache error for %s: %v", label, err)
-						result[label] = json.RawMessage(APIErrorArray(label, errmsg))
-					}
-				})
-		return result
-	})
+	NewStatsServer(allowedHTTPHosts, func() interface{} {
+			// Serve latest cached Podman data per host
+			result := make(map[string]interface{})
+			podmanStatsCache.Range(func(label string, data []byte) {
+				var parsed interface{}
+				if err := json.Unmarshal(data, &parsed); err == nil {
+					result[label] = parsed
+				} else {
+					// If parsing fails, emit a standard error array for this label
+					errmsg := FormatErrorMsg("Internal stats/cache error for %s: %v", label, err)
+					result[label] = json.RawMessage(APIErrorArray(label, errmsg))
+				}
+			})
+			return result
+		}).Start()
+	
 
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
