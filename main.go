@@ -6,11 +6,6 @@ import (
 	"time"
 )
 
-// expandUIDVariable now handled by tunnel.go
-
-// SetupTunnels is now handled in tunnel.go
-
-// pollHosts now provided in poller.go
 
 var podmanStatsCache = NewPodmanStatsCache()
 
