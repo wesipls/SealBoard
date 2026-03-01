@@ -41,7 +41,7 @@ func main() {
 				}
 			})
 			return result
-		}).Start()
+			}, podmanStatsCache).Start()
 	
 
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)

@@ -8,9 +8,9 @@ import (
 // APIError is a standard error object for API responses
 func APIErrorArray(label, errmsg string) []byte {
 	errArr := []map[string]interface{}{{
-		"host": label,
+		"host":   label,
 		"status": "error",
-		"error": errmsg,
+		"error":  errmsg,
 	}}
 	arrBytes, _ := json.Marshal(errArr)
 	return arrBytes
@@ -19,9 +19,9 @@ func APIErrorArray(label, errmsg string) []byte {
 // APIErrorObj returns a single error object as JSON
 func APIErrorObj(label, errmsg string) []byte {
 	errObj := map[string]interface{}{
-		"host": label,
+		"host":   label,
 		"status": "error",
-		"error": errmsg,
+		"error":  errmsg,
 	}
 	b, _ := json.Marshal(errObj)
 	return b
@@ -31,4 +31,3 @@ func APIErrorObj(label, errmsg string) []byte {
 func FormatErrorMsg(format string, a ...interface{}) string {
 	return fmt.Sprintf(format, a...)
 }
-

@@ -37,28 +37,31 @@ async function fetchStats() {
   }
 }
 
+// Fetches detailed data (stats/config/logs) for a specific container
+async function fetchContainerDetail(hostLabel, containerID, type) {
+  try {
+    const response = await fetch(`/api/host/${hostLabel}/container/${containerID}/${type}`);
+    if (!response.ok) throw new Error('Network response was not ok');
+    const data = await response.json();
+    // For demo: display detail below table; future could open modal
+    statsContainer.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+  } catch (err) {
+    statsContainer.innerHTML += `<p class="error">Failed to fetch ${type}: ${err}</p>`;
+  }
+}
+
 function renderStats(data) {
   if (!data.length) {
     statsContainer.innerHTML = '<p>No containers found.</p>';
     return;
   }
   let html = `<table class="table">
-    <thead><tr><th>Host</th><th>ID</th><th>Name</th><th>Status</th></tr></thead>
+    <thead><tr><th>Host</th><th>ID</th><th>Name</th><th>Status</th><th>Details</th></tr></thead>
     <tbody>`;
   for (const container of data) {
     if (container.error) {
       html += `<tr class="error">
-        <td colspan="4">${container.host}: <span style='color:red'>${container.error}</span></td>
-      </tr>`;
-      continue;
-    }
-    // Display as error if status is 'error' (regardless of error msg)
-    if (container.status === 'error' || container.State === 'error' || container.Status === 'error') {
-      html += `<tr class="error">
-        <td>${container.host || ''}</td>
-        <td>${container.Id || ''}</td>
-        <td>${container.Names ? container.Names.join(', ') : ''}</td>
-        <td><span style='color:red'>error</span></td>
+        <td colspan="5">${container.host}: <span style='color:red'>${container.error}</span></td>
       </tr>`;
       continue;
     }
@@ -67,6 +70,9 @@ function renderStats(data) {
       <td>${container.Id || ''}</td>
       <td>${container.Names ? container.Names.join(', ') : ''}</td>
       <td>${container.State || container.Status || ''}</td>
+      <td><button onclick="fetchContainerDetail('${container.host}','${container.Id}','stats')">Stats</button>
+          <button onclick="fetchContainerDetail('${container.host}','${container.Id}','config')">Config</button>
+          <button onclick="fetchContainerDetail('${container.host}','${container.Id}','logs')">Logs</button></td>
     </tr>`;
   }
   html += '</tbody></table>';
@@ -89,6 +95,5 @@ searchInput.addEventListener('input', function() {
 
 // Initial fetch
 fetchStats();
-// Optionally refresh every X seconds
 setInterval(fetchStats, 15000);
 
