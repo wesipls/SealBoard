@@ -96,12 +96,6 @@ func (s *StatsServer) Start() {
 			json.NewEncoder(w).Encode(result)
 			return
 		}
-		if dataType == "logs" {
-			// Streaming TODO: use StreamPodmanContainerData from podman_stream.go
-			result = map[string]string{"host":hostLabel, "container":containerID, "type":dataType, "message":"streaming logs not implemented yet"}
-			json.NewEncoder(w).Encode(result)
-			return
-		}
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("unsupported data type"))
 	})
