@@ -51,7 +51,7 @@ func CallPodmanAPIUnix(socketPath, label string, statsCache *PodmanStatsCache) {
 		},
 	}
 	client := &http.Client{Transport: transport}
-	url := "http://d/v4.0.0/containers/json?all=true" // The host part is ignored for UNIX sockets
+	url := "http://d/v4.0.0/libpod/containers/json?all=true" // The host part is ignored for UNIX sockets
 	resp, err := client.Get(url)
 	if err != nil {
 		util.LogError("Failed to request Podman API (unix socket) at %s: %v", label, err)
