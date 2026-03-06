@@ -15,31 +15,40 @@ import (
 // PodmanStatsCache encapsulates stats and locking
  type PodmanStatsCache struct {
 	mu    sync.RWMutex
-	stats map[string][]byte // key: host label, value: raw json
+ 	stats map[string]map[string][]byte // key: host label, value: map[endpoint]data
 }
 
 func NewPodmanStatsCache() *PodmanStatsCache {
-	return &PodmanStatsCache{stats: make(map[string][]byte)}
+	return &PodmanStatsCache{stats: make(map[string]map[string][]byte)}
 }
 
-func (c *PodmanStatsCache) Set(label string, data []byte) {
+func (c *PodmanStatsCache) Set(label string, endpoint string, data []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.stats[label] = data
+	if c.stats[label] == nil {
+		c.stats[label] = make(map[string][]byte)
+	}
+	c.stats[label][endpoint] = data
 }
 
-func (c *PodmanStatsCache) Get(label string) ([]byte, bool) {
+func (c *PodmanStatsCache) Get(label, endpoint string) ([]byte, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	data, ok := c.stats[label]
+	endpoints, ok := c.stats[label]
+	if !ok {
+		return nil, false
+	}
+	data, ok := endpoints[endpoint]
 	return data, ok
 }
 
-func (c *PodmanStatsCache) Range(fn func(label string, data []byte)) {
+func (c *PodmanStatsCache) Range(fn func(label, endpoint string, data []byte)) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	for label, data := range c.stats {
-		fn(label, data)
+	for label, endpoints := range c.stats {
+		for endpoint, data := range endpoints {
+			fn(label, endpoint, data)
+		}
 	}
 }
 
@@ -55,7 +64,7 @@ func CallPodmanAPIUnixEndpoint(socketPath, label, endpoint string, statsCache *P
 	resp, err := client.Get(url)
 	if err != nil {
 		util.LogError("Failed to request Podman API (unix socket) at %s endpoint %s: %v", label, endpoint, err)
-		statsCache.Set(label, util.APIErrorArray(label, fmt.Sprintf("Failed to request Podman API (unix socket): %v", err)))
+		statsCache.Set(label, endpoint, util.APIErrorArray(label, fmt.Sprintf("Failed to request Podman API (unix socket): %v", err)))
 		return
 	}
 	defer resp.Body.Close()
@@ -64,7 +73,7 @@ func CallPodmanAPIUnixEndpoint(socketPath, label, endpoint string, statsCache *P
 		util.LogError("Failed to read UNIX Podman API response at %s endpoint %s: %v", label, endpoint, err)
 		return
 	}
-	statsCache.Set(label, body)
+	statsCache.Set(label, endpoint, body)
 	util.LogInfo("[%s] Podman API cached for endpoint %s, %d bytes", label, endpoint, len(body))
 }
 

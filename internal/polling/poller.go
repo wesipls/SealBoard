@@ -15,13 +15,19 @@ func PollHosts(hosts []config.HostConfig, podmanStatsCache *api.PodmanStatsCache
 			if host.SocketPath != "" {
 				sp := host.SocketPath
 				sp = util.ExpandUIDVariable(sp)
-				api.CallPodmanAPIUnixEndpoint(sp, host.Name, "http://d/v4.0.0/libpod/containers/json?all=true", podmanStatsCache)
+				for _, endpoint := range api.PodmanLibpodEndpoints {
+								api.CallPodmanAPIUnixEndpoint(sp, host.Name, endpoint, podmanStatsCache)
+							}
+				
 			}
 			continue
 		}
 		if host.LocalSocketPath != "" && host.RemoteSocketPath != "" {
 			lsp := host.LocalSocketPath
-			api.CallPodmanAPIUnixEndpoint(lsp, host.Name, "http://d/v4.0.0/libpod/containers/json?all=true", podmanStatsCache)
+			for _, endpoint := range api.PodmanLibpodEndpoints {
+							api.CallPodmanAPIUnixEndpoint(lsp, host.Name, endpoint, podmanStatsCache)
+						}
+			
 		}
 	}
 }

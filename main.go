@@ -15,6 +15,12 @@ import (
 
 var podmanStatsCache = api.NewPodmanStatsCache()
 
+type containersStatsGetter struct{}
+func (containersStatsGetter) Get(label string) ([]byte, bool) {
+	return podmanStatsCache.Get(label, "http://d/v4.0.0/libpod/containers/json?all=true")
+}
+var ContainersStatsCache = containersStatsGetter{}
+
 func main() {
 	hosts, globalInterval, allowedHTTPHosts, err := config.LoadConfig("seals.cfg")
 	if err != nil {
@@ -27,21 +33,28 @@ func main() {
 	tunnel.SetupTunnels(hosts)
 
 	// Start the lightweight HTTP stats server restricted to allowed hosts
+	// Adapter to expose only the containers endpoint data for /stats
+
+
+
 	api.NewStatsServer(allowedHTTPHosts, func() interface{} {
-			// Serve latest cached Podman data per host
-			result := make(map[string]interface{})
-			podmanStatsCache.Range(func(label string, data []byte) {
-				var parsed interface{}
-				if err := json.Unmarshal(data, &parsed); err == nil {
-					result[label] = parsed
-				} else {
-					// If parsing fails, emit a standard error array for this label
-					errmsg := util.FormatErrorMsg("Internal stats/cache error for %s: %v", label, err)
-					result[label] = json.RawMessage(util.APIErrorArray(label, errmsg))
-				}
-			})
-			return result
-			}, podmanStatsCache).Start()
+		// Serve latest cached Podman data per host
+		result := make(map[string]interface{})
+		for _, label := range hosts {
+			data, ok := podmanStatsCache.Get(label.Name, "http://d/v4.0.0/libpod/containers/json?all=true")
+			if !ok {
+				continue
+			}
+			var parsed interface{}
+			if err := json.Unmarshal(data, &parsed); err == nil {
+				result[label.Name] = parsed
+			} else {
+				errmsg := util.FormatErrorMsg("Internal stats/cache error for %s: %v", label.Name, err)
+				result[label.Name] = json.RawMessage(util.APIErrorArray(label.Name, errmsg))
+			}
+		}
+		return result
+	}, ContainersStatsCache).Start()
 	
 
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
