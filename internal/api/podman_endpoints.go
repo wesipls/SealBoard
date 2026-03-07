@@ -22,7 +22,7 @@ var PodmanLibpodEndpoints = []string{
 	//	"http://d/v4.0.0/libpod/containers/{id}/stats?stream=false",                    // Stats for {id}
 	//	"http://d/v4.0.0/libpod/containers/{id}/top",                                   // Top for {id}
 	// Pod endpoints
-	//	"http://d/v4.0.0/libpod/pods/json",               // List pods
+	"http://d/v4.0.0/libpod/pods/json", // List pods
 	//	"http://d/v4.0.0/libpod/pods/stats?stream=false", // Pod stats
 	//	"http://d/v4.0.0/libpod/pods/{id}/json",          // Inspect pod {id}
 	//	"http://d/v4.0.0/libpod/pods/{id}/top",           // Pod top {id}
