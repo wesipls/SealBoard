@@ -12,11 +12,11 @@ import (
  type StatsServer struct {
 	allowedHosts []string
 	statsFunc func() interface{}
- 	statsCache interface{Get(label string) ([]byte, bool)}
+ 	statsCache interface{Get(label, endpoint string) ([]byte, bool)}
 }
 
 // NewStatsServer initializes a StatsServer
-func NewStatsServer(allowedHosts []string, statsFunc func() interface{}, statsCache interface{Get(label string) ([]byte, bool)}) *StatsServer {
+func NewStatsServer(allowedHosts []string, statsFunc func() interface{}, statsCache interface{Get(label, endpoint string) ([]byte, bool)}) *StatsServer {
 	return &StatsServer{
 		allowedHosts: allowedHosts,
 		statsFunc: statsFunc,
@@ -89,11 +89,32 @@ func (s *StatsServer) Start() {
 		object := vars["object"]
 		id := vars["id"]
 		typeSuffix := vars["type"]
-		data, ok := s.statsCache.Get(hostLabel)
-		if !ok { w.WriteHeader(http.StatusNotFound); w.Write([]byte("host stats not available")); return }
-		var arr []map[string]interface{}
-		json.Unmarshal(data, &arr)
+		// Choose correct endpoint for each object
+		var endpoint string
+		switch object {
+		case "containers":
+			endpoint = "http://d/v4.0.0/libpod/containers/json?all=true"
+		case "pods":
+			endpoint = "http://d/v4.0.0/libpod/pods/json"
+		}
+		if endpoint != "" {
+			data, ok := s.statsCache.Get(hostLabel, endpoint)
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte(object + " stats not available"))
+				return
+			}
+			var arr []map[string]interface{}
+			json.Unmarshal(data, &arr)
+			json.NewEncoder(w).Encode(arr)
+			return
+		}
+		// Individual container
 		if object == "container" && id != "" && typeSuffix != "" {
+			cdata, ok := s.statsCache.Get(hostLabel, "http://d/v4.0.0/libpod/containers/json?all=true")
+			if !ok { w.WriteHeader(http.StatusNotFound); w.Write([]byte("host stats not available")); return }
+			var arr []map[string]interface{}
+			json.Unmarshal(cdata, &arr)
 			for _, c := range arr {
 				if cid, ok := c["Id"]; ok && cid == id {
 					json.NewEncoder(w).Encode(c)
@@ -102,14 +123,6 @@ func (s *StatsServer) Start() {
 			}
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("container data not available"))
-			return
-		}
-		if object == "containers" {
-			json.NewEncoder(w).Encode(arr)
-			return
-		}
-		if object == "pods" {
-			json.NewEncoder(w).Encode(arr)
 			return
 		}
 		w.WriteHeader(http.StatusBadRequest)

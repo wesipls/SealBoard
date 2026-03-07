@@ -15,11 +15,8 @@ import (
 
 var podmanStatsCache = api.NewPodmanStatsCache()
 
-type containersStatsGetter struct{}
-func (containersStatsGetter) Get(label string) ([]byte, bool) {
-	return podmanStatsCache.Get(label, "http://d/v4.0.0/libpod/containers/json?all=true")
-}
-var ContainersStatsCache = containersStatsGetter{}
+// We now pass the full PodmanStatsCache which supports Get(label, endpoint string)
+var ContainersStatsCache = podmanStatsCache
 
 func main() {
 	hosts, globalInterval, allowedHTTPHosts, err := config.LoadConfig("seals.cfg")
