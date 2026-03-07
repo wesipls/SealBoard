@@ -24,9 +24,9 @@ func NewStatsServer(allowedHosts []string, statsFunc func() interface{}, statsCa
 	}
 }
 
-// Start launches the HTTP stats server and container endpoints
-func (s *StatsServer) Start() {
-	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+// handleAPI abstracts common http logic (IP check, content-type, error writing) for Podman endpoints.
+func (s *StatsServer) handleAPI(pattern string, parsePath func(*http.Request) (map[string]string, int, string), handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+	http.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
 			util.LogError("Cannot parse remote address: %v", err)
@@ -46,58 +46,74 @@ func (s *StatsServer) Start() {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+
+		vars := map[string]string{}
+		msg := ""
+		if parsePath != nil {
+			var status int
+			vars, status, msg = parsePath(r)
+			if status != http.StatusOK {
+				w.WriteHeader(status)
+				w.Write([]byte(msg))
+				return
+			}
+		}
+		handler(w, r, vars)
+	})
+}
+
+// Start launches the HTTP stats server and container endpoints
+func (s *StatsServer) Start() {
+	s.handleAPI("/stats", nil, func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
 		json.NewEncoder(w).Encode(s.statsFunc())
 	})
 
-	// New: container-specific endpoints
-	http.HandleFunc("/api/host/", func(w http.ResponseWriter, r *http.Request) {
-		remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil { w.WriteHeader(http.StatusForbidden); return }
-		allowed := false
-		for _, host := range s.allowedHosts {
-			if remoteIP == host || host == "*" { allowed = true; break }
+	s.handleAPI("/api/host/", func(r *http.Request) (map[string]string, int, string) {
+		segments := util.SplitAndClean(r.URL.Path)
+		if len(segments) < 3 {
+			return nil, http.StatusBadRequest, "invalid api path"
 		}
-		if !allowed { w.WriteHeader(http.StatusForbidden); w.Write([]byte("forbidden")); return }
-		w.Header().Set("Content-Type", "application/json")
-
-		// pattern: /api/host/{hostLabel}/container/{containerID}/{datatype}
-		// simple parsing
-		var hostLabel, containerID, dataType string
-		path := r.URL.Path
-		segments := util.SplitAndClean(path)
-		if len(segments) < 6 {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("invalid container api path"))
-			return
+		vars := map[string]string{"hostLabel": segments[2]}
+		if len(segments) > 3 {
+			vars["object"] = segments[3]
 		}
-		hostLabel = segments[2]
-		containerID = segments[4]
-		dataType = segments[5] // "stats", "logs", "config"
-		// Implementation: serve actual data from cache (stats/config) or via streaming (logs/stats w/stream)
-		var result interface{}
-		if dataType == "stats" || dataType == "config" {
-			// TODO: Replace podmanStatsCache with new container cache for per-container data
-			// For demo, just fetch host-level stats and filter for matching container
-			data, ok := s.statsCache.Get(hostLabel)
-			if !ok { w.WriteHeader(http.StatusNotFound); w.Write([]byte("host stats not available")); return }
-			var arr []map[string]interface{}
-			json.Unmarshal(data, &arr)
+		if len(segments) > 4 {
+			vars["id"] = segments[4]
+		}
+		if len(segments) > 5 {
+			vars["type"] = segments[5]
+		}
+		return vars, http.StatusOK, ""
+	}, func(w http.ResponseWriter, r *http.Request, vars map[string]string) {
+		hostLabel := vars["hostLabel"]
+		object := vars["object"]
+		id := vars["id"]
+		typeSuffix := vars["type"]
+		data, ok := s.statsCache.Get(hostLabel)
+		if !ok { w.WriteHeader(http.StatusNotFound); w.Write([]byte("host stats not available")); return }
+		var arr []map[string]interface{}
+		json.Unmarshal(data, &arr)
+		if object == "container" && id != "" && typeSuffix != "" {
 			for _, c := range arr {
-				if id, ok := c["Id"]; ok && id == containerID {
-					result = c
-					break
+				if cid, ok := c["Id"]; ok && cid == id {
+					json.NewEncoder(w).Encode(c)
+					return
 				}
 			}
-			if result == nil {
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte("container data not available"))
-				return
-			}
-			json.NewEncoder(w).Encode(result)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("container data not available"))
+			return
+		}
+		if object == "containers" {
+			json.NewEncoder(w).Encode(arr)
+			return
+		}
+		if object == "pods" {
+			json.NewEncoder(w).Encode(arr)
 			return
 		}
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("unsupported data type"))
+		w.Write([]byte("unsupported or incomplete endpoint"))
 	})
 
 	http.Handle("/", http.FileServer(http.Dir("./frontend")))
