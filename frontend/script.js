@@ -25,8 +25,10 @@ function renderStatsByPod(hostsData) {
       }
     }
     // Standalone containers not in any pod
-    let podContainerIds = new Set((hostObj.pods||[]).flatMap(pod=>pod.Containers||[]));
-    const standalone = (hostObj.containers||[]).filter(c => !c.Pod || !podContainerIds.has(c.Id));
+    // Build set of all pod IDs
+    let podIds = new Set((hostObj.pods||[]).map(pod => pod.Id));
+    // Standalone containers are those without a Pod property matching any known pod ID
+    const standalone = (hostObj.containers||[]).filter(c => !c.Pod || !podIds.has(c.Pod));
     if (standalone.length) {
       html += `<div style='margin-bottom:1em;'><div style='font-weight:bold;'>No Pod</div>`;
       for (const container of standalone) {
