@@ -16,10 +16,10 @@ var PodmanLibpodEndpoints = []string{
 	"http://d/v4.0.0/libpod/containers/json?all=true", // List all containers
 	//	"http://d/v4.0.0/libpod/containers/json?all=false",     // List running containers
 	//	"http://d/v4.0.0/libpod/containers/stats?stream=false", // Stats all containers
-	// Specific container endpoints (use PodmanContainerEndpointURL or interpolate)
+	// Specific container endpoints (require {id} interpolation at runtime; see InterpolateEndpoint)
 	//	"http://d/v4.0.0/libpod/containers/{id}/json",                                  // Inspect container {id}
 	//	"http://d/v4.0.0/libpod/containers/{id}/logs?stderr=true&stdout=true&tail=100", // Logs for {id}
-	//	"http://d/v4.0.0/libpod/containers/{id}/stats?stream=false",                    // Stats for {id}
+	"http://d/v4.0.0/libpod/containers/{id}/stats?stream=false", // Stats for {id}
 	//	"http://d/v4.0.0/libpod/containers/{id}/top",                                   // Top for {id}
 	// Pod endpoints
 	"http://d/v4.0.0/libpod/pods/json", // List pods

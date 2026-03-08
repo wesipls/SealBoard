@@ -16,6 +16,7 @@ function renderStatsByPod(hostsData) {
           html += `<div class="container-box">
             <div><b>Name:</b> ${container.Names ? container.Names.join(', ') : ''}</div>
             <div><b>Status:</b> ${container.State || container.Status || ''}</div>
+                        <button onclick="showStats('${hostObj.host}', '${container.Id}')">Stats</button>
           </div>`;
         }
         if (!podContainers.length) {
@@ -68,7 +69,65 @@ async function fetchStats() {
   renderStatsByPod(allHostData);
 }
 
+// Fetch specific Podman container endpoint data for a container
+async function fetchContainerEndpoint(host, containerId, endpointType) {
+  // endpointType: 'inspect', 'logs', 'stats', or 'top'
+  let url = `/api/host/${host}/containers/${containerId}/${endpointType}`;
+  try {
+    let resp = await fetch(url);
+    if (resp.ok) return await resp.json();
+    else throw new Error(`Request failed for ${url}`);
+  } catch (err) {
+    console.error('API error:', err);
+    return null;
+  }
+}
 
+// Show container stats when the Stats button is clicked
+async function showStats(host, containerId) {
+  const containerStats = await fetchContainerEndpoint(host, containerId, 'stats');
+  let statsStr = '';
+  if (!containerStats) {
+    statsStr = 'No stats data.';
+  } else {
+    // Common Podman stats object surface: look for memory and cpu breakdowns
+    const cpu = containerStats.CPU_stats || containerStats.CPU || containerStats.cpu_stats || containerStats.cpu;
+    const mem = containerStats.Memory_stats || containerStats.Memory || containerStats.mem_stats || containerStats.mem;
+    if (cpu || mem) {
+      if (cpu) {
+        statsStr += 'CPU: ';
+        if (cpu.cpu_percent !== undefined) statsStr += cpu.cpu_percent + '%\n';
+        else statsStr += JSON.stringify(cpu) + '\n';
+      }
+      if (mem) {
+        statsStr += 'Memory: ';
+        if (mem.usage !== undefined && mem.limit !== undefined) statsStr += `${(mem.usage/1048576).toFixed(2)} MiB / ${(mem.limit/1048576).toFixed(2)} MiB (use/limit)\n`;
+        else statsStr += JSON.stringify(mem) + '\n';
+      }
+    } else if (containerStats.cpu_percent !== undefined || containerStats.mem_usage !== undefined) {
+      // Flat Docker-like
+      if (containerStats.cpu_percent !== undefined) statsStr += `CPU: ${containerStats.cpu_percent}%\n`;
+      if (containerStats.mem_usage !== undefined) statsStr += `Mem: ${(containerStats.mem_usage/1048576).toFixed(2)} MiB\n`;
+    } else {
+      statsStr = JSON.stringify(containerStats, null, 2);
+    }
+  }
+  // Try to find (or create) a stats display div directly under the container-box corresponding to containerId
+  const allBoxes = document.querySelectorAll('.container-box');
+  for (const box of allBoxes) {
+    if (box.innerHTML.includes(containerId)) {
+      let statsDiv = box.querySelector('.container-stats-output');
+      if (!statsDiv) {
+        statsDiv = document.createElement('div');
+        statsDiv.className = 'container-stats-output';
+        statsDiv.style = 'white-space:pre;font-size:smaller;padding:0.5em;background:#181F26;color:#BFF;border-radius:4px;margin-top:4px;';
+        box.appendChild(statsDiv);
+      }
+      statsDiv.textContent = statsStr;
+      break;
+    }
+  }
+}
 
 fetchStats();
 setInterval(fetchStats, 4000);

@@ -49,20 +49,33 @@ func (s *StatsServer) RegisterPodmanAPIHandlers() {
 			json.NewEncoder(w).Encode(arr)
 			return
 		}
-		// Individual container
+		// Individual container, all supported endpoints with {id} substitution
 		if object == "container" && id != "" && typeSuffix != "" {
-			cdata, ok := s.statsCache.Get(hostLabel, "http://d/v4.0.0/libpod/containers/json?all=true")
-			if !ok { w.WriteHeader(http.StatusNotFound); w.Write([]byte("host stats not available")); return }
-			var arr []map[string]interface{}
-			json.Unmarshal(cdata, &arr)
-			for _, c := range arr {
-				if cid, ok := c["Id"]; ok && cid == id {
-					json.NewEncoder(w).Encode(c)
-					return
-				}
+			// Map logical types to podman endpoint templates
+			var endpoint string
+			switch typeSuffix {
+			case "inspect":
+				endpoint = "http://d/v4.0.0/libpod/containers/{id}/json"
+			case "logs":
+				endpoint = "http://d/v4.0.0/libpod/containers/{id}/logs?stderr=true&stdout=true&tail=100"
+			case "stats":
+				endpoint = "http://d/v4.0.0/libpod/containers/{id}/stats?stream=false"
+			case "top":
+				endpoint = "http://d/v4.0.0/libpod/containers/{id}/top"
+			default:
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("unsupported container endpoint type"))
+				return
 			}
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("container data not available"))
+			endpoint = InterpolateEndpoint(endpoint, map[string]string{"id": id})
+			data, ok := s.statsCache.Get(hostLabel, endpoint)
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("container endpoint data not available"))
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write(data)
 			return
 		}
 		w.WriteHeader(http.StatusBadRequest)
