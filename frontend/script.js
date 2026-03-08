@@ -42,7 +42,6 @@ function renderStatsByPod(hostsData) {
 }
 
 const statsContainer = document.getElementById('statsContainer');
-const searchInput = document.getElementById('searchInput');
 
 async function fetchStats() {
   const resp = await fetch('/stats');
@@ -69,37 +68,6 @@ async function fetchStats() {
   renderStatsByPod(allHostData);
 }
 
-
-function handleSearch() {
-  const text = searchInput.value.trim().toLowerCase();
-  fetchStatsFiltered(text);
-}
-
-async function fetchStatsFiltered(filterText) {
-  const resp = await fetch('/stats');
-  const raw = await resp.json();
-  let containers = [];
-  for (const host in raw) {
-    if (Array.isArray(raw[host])) {
-      for (const cont of raw[host]) {
-        cont.host = host;
-        containers.push(cont);
-      }
-    } else if (raw[host] && raw[host].error) {
-      containers.push({ host, error: raw[host].error });
-    }
-  }
-  if (filterText) {
-    containers = containers.filter(cont =>
-      (cont.Names && cont.Names.join(',').toLowerCase().includes(filterText)) ||
-      (cont.Id && cont.Id.toLowerCase().includes(filterText)) ||
-      (cont.host && cont.host.toLowerCase().includes(filterText))
-    );
-  }
-  renderStats(containers);
-}
-
-searchInput.addEventListener('input', handleSearch);
 
 
 fetchStats();
