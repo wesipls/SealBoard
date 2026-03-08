@@ -11,12 +11,12 @@ import (
 // StatsServer encapsulates HTTP stats serving logic and allowed hosts
  type StatsServer struct {
 	allowedHosts []string
-	statsFunc func() interface{}
+	statsFunc func() any
  	statsCache interface{Get(label, endpoint string) ([]byte, bool)}
 }
 
 // NewStatsServer initializes a StatsServer
-func NewStatsServer(allowedHosts []string, statsFunc func() interface{}, statsCache interface{Get(label, endpoint string) ([]byte, bool)}) *StatsServer {
+func NewStatsServer(allowedHosts []string, statsFunc func() any, statsCache interface{Get(label, endpoint string) ([]byte, bool)}) *StatsServer {
 	return &StatsServer{
 		allowedHosts: allowedHosts,
 		statsFunc: statsFunc,

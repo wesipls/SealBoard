@@ -33,15 +33,15 @@ func main() {
 
 
 
-	api.NewStatsServer(allowedHTTPHosts, func() interface{} {
+	api.NewStatsServer(allowedHTTPHosts, func() any {
 		// Serve latest cached Podman data per host
-		result := make(map[string]interface{})
+		result := make(map[string]any)
 		for _, label := range hosts {
 			data, ok := podmanStatsCache.Get(label.Name, "http://d/v4.0.0/libpod/containers/json?all=true")
 			if !ok {
 				continue
 			}
-			var parsed interface{}
+			var parsed any
 			if err := json.Unmarshal(data, &parsed); err == nil {
 				result[label.Name] = parsed
 			} else {
