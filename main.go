@@ -15,7 +15,6 @@ import (
 
 var podmanStatsCache = api.NewPodmanStatsCache()
 
-// We now pass the full PodmanStatsCache which supports Get(label, endpoint string)
 var ContainersStatsCache = podmanStatsCache
 
 func main() {
