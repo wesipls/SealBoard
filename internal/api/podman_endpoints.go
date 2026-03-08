@@ -45,29 +45,4 @@ func InterpolateEndpoint(endpoint string, params map[string]string) string {
 	return endpoint
 }
 
-// PodmanContainerEndpointType enumerates supported per-container endpoint types
-const (
-	PodmanContainerInspect = "inspect"
-	PodmanContainerLogs    = "logs"
-	PodmanContainerStats   = "stats"
-	PodmanContainerTop     = "top"
-	PodmanContainerConfig  = "config"
-)
 
-// PodmanContainerEndpointURL generates the Podman Unix endpoint URL for a given container and endpoint type
-func PodmanContainerEndpointURL(containerID, endpointType string) string {
-	switch endpointType {
-	case PodmanContainerInspect:
-		return "http://d/v4.0.0/libpod/containers/" + containerID + "/json"
-	case PodmanContainerLogs:
-		return "http://d/v4.0.0/libpod/containers/" + containerID + "/logs?stderr=true&stdout=true&tail=100"
-	case PodmanContainerStats:
-		return "http://d/v4.0.0/libpod/containers/" + containerID + "/stats?stream=false"
-	case PodmanContainerTop:
-		return "http://d/v4.0.0/libpod/containers/" + containerID + "/top"
-	case PodmanContainerConfig:
-		return "http://d/v4.0.0/libpod/containers/" + containerID + "/mounts"
-	default:
-		return ""
-	}
-}
