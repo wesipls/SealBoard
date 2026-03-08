@@ -69,38 +69,6 @@ async function fetchStats() {
   renderStatsByPod(allHostData);
 }
 
-function renderStats(data) {
-  if (!data.length) {
-    statsContainer.innerHTML = '<p>No containers found.</p>';
-    return;
-  }
-  // Group containers by host
-  const grouped = {};
-  for (const container of data) {
-    const host = container.host || 'Unknown Host';
-    if (!grouped[host]) grouped[host] = [];
-    grouped[host].push(container);
-  }
-  let html = '';
-  for (const host in grouped) {
-    html += `<div class="host-box"><h2>${host}</h2>`;
-    const hostContainers = grouped[host];
-    if (hostContainers.length === 1 && hostContainers[0].error) {
-      html += `<div class='error-box'><span style='color:red'>${hostContainers[0].error}</span></div>`;
-    } else {
-      for (const container of hostContainers) {
-        html += `<div class="container-box">
-          
-          <div><b>Name:</b> ${container.Names ? container.Names.join(', ') : ''}</div>
-          <div><b>Status:</b> ${container.State || container.Status || ''}</div>
-          
-        </div>`;
-      }
-    }
-    html += '</div>';
-  }
-  statsContainer.innerHTML = html;
-}
 
 function handleSearch() {
   const text = searchInput.value.trim().toLowerCase();
