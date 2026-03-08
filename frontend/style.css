@@ -10,20 +10,6 @@ h1 {
   margin-top: 2rem;
 }
 
-/* Search bar styling */
-.search-container {
-  width: 90%;
-  margin: 1rem auto;
-  display: flex;
-  justify-content: flex-end;
-}
-
-#searchInput {
-  padding: 0.4em 1em;
-  border: 1px solid #bbb;
-  border-radius: 5px;
-  font-size: 1.2em;
-}
 
 #statsContainer {
   width: 92%;
@@ -75,11 +61,4 @@ h1 {
 }
 
 
-.error-box {
-  color: #fff;
-  background: #ba4848;
-  border-radius: 5px;
-  padding: 0.65em 1em;
-  margin: 0.8em 0;
-}
 
