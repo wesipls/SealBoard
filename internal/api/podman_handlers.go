@@ -40,8 +40,7 @@ func (s *StatsServer) RegisterPodmanAPIHandlers() {
 		if endpoint != "" {
 			data, ok := s.statsCache.Get(hostLabel, endpoint)
 			if !ok {
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(object + " stats not available"))
+							util.HandleAPIError(w, http.StatusNotFound, hostLabel, object+" stats not available")
 				return
 			}
 			var arr []map[string]interface{}

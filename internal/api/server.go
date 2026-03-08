@@ -29,8 +29,7 @@ func (s *StatsServer) handleAPI(pattern string, parsePath func(*http.Request) (m
 	http.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
-			util.LogError("Cannot parse remote address: %v", err)
-			w.WriteHeader(http.StatusForbidden)
+			util.HandleAPIError(w, http.StatusForbidden, "", "Cannot parse remote address: "+err.Error())
 			return
 		}
 		allowed := false

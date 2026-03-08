@@ -47,7 +47,7 @@ func main() {
 				result[label.Name] = parsed
 			} else {
 				errmsg := util.FormatErrorMsg("Internal stats/cache error for %s: %v", label.Name, err)
-				result[label.Name] = json.RawMessage(util.APIErrorArray(label.Name, errmsg))
+								result[label.Name] = json.RawMessage(util.APIErrorArray(label.Name, errmsg)) // Candidates for direct HandleAPIError, but response write pattern differs in main.go
 			}
 		}
 		return result
