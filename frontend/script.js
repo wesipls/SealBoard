@@ -49,8 +49,12 @@ async function loadPodsAllHosts() {
         const ramSpan = document.createElement('div');
         ramSpan.textContent = 'RAM: Loading...';
         ramSpan.className = 'ram-usage';
+        const cpuSpan = document.createElement('div');
+        cpuSpan.textContent = 'CPU: Loading...';
+        cpuSpan.className = 'cpu-usage';
         li.appendChild(ramSpan);
-        if (cId) fetchAndShowRam(host, cId, ramSpan);
+        li.appendChild(cpuSpan);
+        if (cId) fetchAndShowStats(host, cId, ramSpan, cpuSpan);
         containerList.appendChild(li);
       });
       podBlock.appendChild(containerList);
@@ -76,8 +80,12 @@ async function loadPodsAllHosts() {
         const ramSpan = document.createElement('div');
         ramSpan.textContent = 'RAM: Loading...';
         ramSpan.className = 'ram-usage';
+        const cpuSpan = document.createElement('div');
+        cpuSpan.textContent = 'CPU: Loading...';
+        cpuSpan.className = 'cpu-usage';
         li.appendChild(ramSpan);
-        if (cId) fetchAndShowRam(host, cId, ramSpan);
+        li.appendChild(cpuSpan);
+        if (cId) fetchAndShowStats(host, cId, ramSpan, cpuSpan);
         ul.appendChild(li);
       });
       podlessBlock.appendChild(ul);
@@ -91,13 +99,12 @@ async function loadPodsAllHosts() {
   });
 }
 
-async function fetchAndShowRam(host, containerId, ramSpan) {
+async function fetchAndShowStats(host, containerId, ramSpan, cpuSpan) {
   try {
     const resp = await fetch(`/api/host/${host}/container/${containerId}/stats`);
     const stat = await resp.json();
-    // Defensive parsing for multiple possible structures
+    // Defensive parsing for RAM
     let ram = undefined;
-    // Podman: stat.memory_stats.usage, or .memory.usage (sometimes .usage_total ?)
     if (stat.memory_stats && typeof stat.memory_stats.usage === 'number') {
       ram = stat.memory_stats.usage;
     } else if (stat.memory && typeof stat.memory.usage === 'number') {
@@ -107,7 +114,6 @@ async function fetchAndShowRam(host, containerId, ramSpan) {
     }
     if (typeof ram === 'number') {
       let msg = 'RAM: ' + (ram / 1024 / 1024).toFixed(1) + ' MB';
-      // Show RAM limit if available
       let limit = undefined;
       if (stat.memory_stats && typeof stat.memory_stats.limit === 'number') {
         limit = stat.memory_stats.limit;
@@ -121,8 +127,26 @@ async function fetchAndShowRam(host, containerId, ramSpan) {
     } else {
       ramSpan.textContent = 'RAM: N/A';
     }
+    // Defensive parsing for CPU
+    let cpuUsage = undefined;
+    // Podman v4/stat API: .cpu_stats.cpu_usage.total_usage (in nanoseconds?), system_cpu_usage, .cpu_stats.online_cpus, etc
+    if (stat.cpu_stats && stat.cpu_stats.cpu_usage && typeof stat.cpu_stats.cpu_usage.total_usage === 'number') {
+      const usage = stat.cpu_stats.cpu_usage.total_usage;
+      let cpus = stat.cpu_stats.online_cpus || (stat.cpu_stats.cpu_count || stat.cpu_count) || 1;
+      // Show as nanoseconds, try to render core count
+      cpuUsage = `CPU: ${(usage/1e9).toFixed(2)}s total`;
+      if (cpus && typeof cpus === 'number') {
+        cpuUsage += `, ${cpus} CPU${cpus > 1 ? 's' : ''}`;
+      }
+    }
+    // Fallback
+    if (!cpuUsage && typeof stat.cpu_percent === 'number') {
+      cpuUsage = `CPU: ${stat.cpu_percent.toFixed(1)}%`;
+    }
+    cpuSpan.textContent = cpuUsage || 'CPU: N/A';
   } catch(e) {
     ramSpan.textContent = 'RAM: Error';
+    cpuSpan.textContent = 'CPU: Error';
   }
 }
 
