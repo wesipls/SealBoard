@@ -43,8 +43,14 @@ async function loadPodsAllHosts() {
       const containersInPod = (pod.Containers || pod.containers || []);
       containersInPod.forEach(c => {
         const cname = c.Name || c.Names || c.name || c.Id || c.ID || JSON.stringify(c);
+        const cId = c.Id || c.ID || c.id;
         const li = document.createElement('li');
         li.textContent = cname;
+        const ramSpan = document.createElement('div');
+        ramSpan.textContent = 'RAM: Loading...';
+        ramSpan.className = 'ram-usage';
+        li.appendChild(ramSpan);
+        if (cId) fetchAndShowRam(host, cId, ramSpan);
         containerList.appendChild(li);
       });
       podBlock.appendChild(containerList);
@@ -64,8 +70,14 @@ async function loadPodsAllHosts() {
       const ul = document.createElement('ul');
       podless.forEach(c => {
         const cname = c.Name || c.Names || c.name || c.Id || c.ID || JSON.stringify(c);
+        const cId = c.Id || c.ID || c.id;
         const li = document.createElement('li');
         li.textContent = cname;
+        const ramSpan = document.createElement('div');
+        ramSpan.textContent = 'RAM: Loading...';
+        ramSpan.className = 'ram-usage';
+        li.appendChild(ramSpan);
+        if (cId) fetchAndShowRam(host, cId, ramSpan);
         ul.appendChild(li);
       });
       podlessBlock.appendChild(ul);
@@ -77,6 +89,30 @@ async function loadPodsAllHosts() {
       podsDiv.appendChild(msg);
     }
   });
+}
+
+async function fetchAndShowRam(host, containerId, ramSpan) {
+  try {
+    const resp = await fetch(`/api/host/${host}/container/${containerId}/stats`);
+    const stat = await resp.json();
+    // Defensive parsing for multiple possible structures
+    let ram = undefined;
+    // Podman: stat.memory_stats.usage, or .memory.usage (sometimes .usage_total ?)
+    if (stat.memory_stats && typeof stat.memory_stats.usage === 'number') {
+      ram = stat.memory_stats.usage;
+    } else if (stat.memory && typeof stat.memory.usage === 'number') {
+      ram = stat.memory.usage;
+    } else if (typeof stat.usage === 'number') {
+      ram = stat.usage;
+    }
+    if (typeof ram === 'number') {
+      ramSpan.textContent = 'RAM: ' + (ram / 1024 / 1024).toFixed(1) + ' MB';
+    } else {
+      ramSpan.textContent = 'RAM: N/A';
+    }
+  } catch(e) {
+    ramSpan.textContent = 'RAM: Error';
+  }
 }
 
 loadPodsAllHosts();
