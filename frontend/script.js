@@ -106,7 +106,18 @@ async function fetchAndShowRam(host, containerId, ramSpan) {
       ram = stat.usage;
     }
     if (typeof ram === 'number') {
-      ramSpan.textContent = 'RAM: ' + (ram / 1024 / 1024).toFixed(1) + ' MB';
+      let msg = 'RAM: ' + (ram / 1024 / 1024).toFixed(1) + ' MB';
+      // Show RAM limit if available
+      let limit = undefined;
+      if (stat.memory_stats && typeof stat.memory_stats.limit === 'number') {
+        limit = stat.memory_stats.limit;
+      } else if (stat.memory && typeof stat.memory.limit === 'number') {
+        limit = stat.memory.limit;
+      }
+      if (typeof limit === 'number' && limit > 0) {
+        msg += ' / ' + (limit / 1024 / 1024).toFixed(1) + ' MB';
+      }
+      ramSpan.textContent = msg;
     } else {
       ramSpan.textContent = 'RAM: N/A';
     }
