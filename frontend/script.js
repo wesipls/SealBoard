@@ -1,89 +1,83 @@
-// Modernized frontend: groups pods/containers per host in separate boxes
-
-function renderStatsByPod(hostsData) {
-  if (!hostsData.length) {
-    statsContainer.innerHTML = '<p>No data found.</p>';
-    return;
-  }
-  let html = '';
-  for (const hostObj of hostsData) {
-    html += `<div class="host-box"><h2>${hostObj.host}</h2>`;
-    if (hostObj.pods && hostObj.pods.length > 0) {
-      for (const pod of hostObj.pods) {
-        html += `<div style='margin-bottom:1em;'><div style='font-weight:bold;'>Pod: ${pod.Name || pod.Id}</div>`;
-        let podContainers = (hostObj.containers || []).filter(c => c.Pod === pod.Id);
-        for (const container of podContainers) {
-          html += `<div class="container-box">
-            <div><b>Name:</b> ${container.Names ? container.Names.join(', ') : ''}</div>
-            <div><b>Status:</b> ${container.State || container.Status || ''}</div>
-                        
-          </div>`;
-        }
-        if (!podContainers.length) {
-          html += `<div style='padding:0.5em;'>No containers in this pod.</div>`;
-        }
-        html += '</div>';
-      }
-    }
-    // Standalone containers not in any pod
-    // Build set of all pod IDs
-    let podIds = new Set((hostObj.pods||[]).map(pod => pod.Id));
-    // Standalone containers are those without a Pod property matching any known pod ID
-    const standalone = (hostObj.containers||[]).filter(c => !c.Pod || !podIds.has(c.Pod));
-    if (standalone.length) {
-      html += `<div style='margin-bottom:1em;'><div style='font-weight:bold;'>No Pod</div>`;
-      for (const container of standalone) {
-        html += `<div class="container-box"><div><b>Name:</b> ${container.Names ? container.Names.join(', ') : ''}</div><div><b>Status:</b> ${container.State || container.Status || ''}</div></div>`;
-      }
-      html += '</div>';
-    }
-    html += '</div>';
-  }
-  statsContainer.innerHTML = html;
-}
-
-const statsContainer = document.getElementById('statsContainer');
-
-async function fetchStats() {
-  const resp = await fetch('/stats');
-  const raw = await resp.json();
-  let hosts = Object.keys(raw);
-  let allHostData = [];
-  for (const host of hosts) {
-    let hostObj = { host };
-    // Fetch pods and containers for each host
-    let pods = [], containers = [];
+// Fetches all hosts, then for each host fetches pods, displays each pod in a side-by-side div
+async function loadPodsAllHosts() {
+  const res = await fetch('/stats');
+  const stats = await res.json();
+  const hosts = Object.keys(stats);
+  const podsDiv = document.getElementById('pods');
+  podsDiv.innerHTML = 'Loading...';
+  let results = [];
+  for (let host of hosts) {
     try {
-      let podsResp = await fetch(`/api/host/${host}/pods`);
-      if (podsResp.ok) pods = await podsResp.json();
-    } catch {}
-    try {
-      let containersResp = await fetch(`/api/host/${host}/containers`);
-      if (containersResp.ok) containers = await containersResp.json();
-    } catch {}
-    hostObj.pods = pods;
-        hostObj.containers = containers;
-        console.log('debug:', { host, pods, containers });
-    allHostData.push(hostObj);
+      const [podResp, containersResp] = await Promise.all([
+        fetch(`/api/host/${host}/pods`),
+        fetch(`/api/host/${host}/containers`)
+      ]);
+      const pods = await podResp.json();
+      const containers = await containersResp.json();
+      results.push({host, pods, containers});
+    } catch {
+      results.push({host, pods: [], containers: []});
+    }
   }
-  renderStatsByPod(allHostData);
+  podsDiv.innerHTML = '';
+  results.forEach(({host, pods, containers}) => {
+    // Gather all IDs of containers that are in any pod
+    const podContainerIds = new Set();
+    pods.forEach(pod => {
+      (pod.Containers || pod.containers || []).forEach(c => {
+        podContainerIds.add(c.Id || c.ID || c.id);
+      });
+    });
+    // Render each pod
+    pods.forEach(pod => {
+      const podName = pod.Name || pod.name || pod.Id || pod.ID || 'Unknown';
+      const podBlock = document.createElement('div');
+      podBlock.className = 'pod-block';
+      podBlock.style.border = '1px solid #ccc';
+      podBlock.style.padding = '1em';
+      podBlock.style.marginRight = '1em';
+      const header = document.createElement('h2');
+      header.textContent = `Pod: ${podName}`;
+      podBlock.appendChild(header);
+      const containerList = document.createElement('ul');
+      const containersInPod = (pod.Containers || pod.containers || []);
+      containersInPod.forEach(c => {
+        const cname = c.Name || c.Names || c.name || c.Id || c.ID || JSON.stringify(c);
+        const li = document.createElement('li');
+        li.textContent = cname;
+        containerList.appendChild(li);
+      });
+      podBlock.appendChild(containerList);
+      podsDiv.appendChild(podBlock);
+    });
+    // Now render containers not assigned to any pod
+    const podless = containers.filter(c => !podContainerIds.has(c.Id || c.ID || c.id));
+    if (podless.length) {
+      const podlessBlock = document.createElement('div');
+      podlessBlock.className = 'pod-block';
+      podlessBlock.style.border = '1px solid #833';
+      podlessBlock.style.padding = '1em';
+      podlessBlock.style.marginRight = '1em';
+      const header = document.createElement('h2');
+      header.textContent = 'Containers not in any pod';
+      podlessBlock.appendChild(header);
+      const ul = document.createElement('ul');
+      podless.forEach(c => {
+        const cname = c.Name || c.Names || c.name || c.Id || c.ID || JSON.stringify(c);
+        const li = document.createElement('li');
+        li.textContent = cname;
+        ul.appendChild(li);
+      });
+      podlessBlock.appendChild(ul);
+      podsDiv.appendChild(podlessBlock);
+    }
+    if (pods.length === 0 && !podless.length) {
+      const msg = document.createElement('div');
+      msg.textContent = `No pods or containers found for host ${host}`;
+      podsDiv.appendChild(msg);
+    }
+  });
 }
 
-// Fetch specific Podman container endpoint data for a container
-async function fetchContainerEndpoint(host, containerId, endpointType) {
-  // endpointType: 'inspect', 'logs', 'stats', or 'top'
-  let url = `/api/host/${host}/containers/${containerId}/${endpointType}`;
-  try {
-    let resp = await fetch(url);
-    if (resp.ok) return await resp.json();
-    else throw new Error(`Request failed for ${url}`);
-  } catch (err) {
-    console.error('API error:', err);
-    return null;
-  }
-}
-
-
-fetchStats();
-setInterval(fetchStats, 4000);
+loadPodsAllHosts();
 
